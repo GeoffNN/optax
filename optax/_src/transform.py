@@ -81,6 +81,13 @@ def _update_moment(updates, moments, decay, order):
       lambda g, t: (1 - decay) * (g ** order) + decay * t, updates, moments)
 
 
+def _update_second_moment(updates, moments, decay, order):
+  """Compute the exponential moving average of the 2nd, possibly complex, moment."""
+  del order
+  return jax.tree_multimap(
+      lambda g, t: (1 - decay) * (g * g.conj()) + decay * t, updates, moments)
+
+
 def _bias_correction(moment, decay, count):
   """Perform bias correction. This becomes a no-op as count goes to infinity."""
   bias_correction = 1 - decay**count
@@ -300,7 +307,7 @@ def scale_by_adam(
   def update_fn(updates, state, params=None):
     del params
     mu = _update_moment(updates, state.mu, b1, 1)
-    nu = _update_moment(updates, state.nu, b2, 2)
+    nu = _update_second_moment(updates, state.nu, b2, 2)
     count_inc = numerics.safe_int32_increment(state.count)
     mu_hat = utils.cast_tree(_bias_correction(mu, b1, count_inc), mu_dtype)
     nu_hat = _bias_correction(nu, b2, count_inc)
